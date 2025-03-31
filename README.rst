@@ -15,7 +15,7 @@ There is no support provided by Element unless you have a
 subscription from Element.
 
 Subscription
-============
+=============
 
 For those that need an enterprise-ready solution, Element
 Server Suite (ESS) is `available via subscription <https://element.io/pricing>`_.
