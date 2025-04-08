@@ -75,8 +75,3 @@ chmod +x install_synapse.sh
 1. Use a Matrix client (e.g., [Element](https://element.io)).
 2. Connect to `http://localhost:8008`.
 3. Create an account (open registration enabled).
-
----
-
-## License
-MIT License. See [LICENSE](LICENSE) (add if applicable).
