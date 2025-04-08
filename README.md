@@ -1,89 +1,82 @@
-# Configuração do Synapse Local via Fork para Desenvolvimento no Ubuntu ou Windows
+# Synapse Homeserver Setup (Development)
 
-A documentação base para esse relatório pode ser encontrada [aqui](https://element-hq.github.io/synapse/latest/development/contributing_guide.html).
+This project deploys a Matrix Synapse homeserver with PostgreSQL using Docker and a custom installation script.  
+**Note:** This setup is intended for testing/development and includes insecure settings (e.g., unverified registration).
 
-## Pré-requisitos
+## Prerequisites
+- Docker and Docker Compose installed
+- Git
+- Ubuntu/Debian-based system (tested on Ubuntu 22.04)
+- Ports `8008` (HTTP) and `3375` (PostgreSQL) available
 
-- Ubuntu ou Windows com WSL 2.0
-- Git, Python 3, Python-venv e Poetry
-- Cargo (Rust), que pode ser instalado seguindo [este link](https://rustup.rs/).
+---
 
-## 1. Instalando os pré-requisitos no Ubuntu 22.04 (WSL 2.0)
+## Quick Start
 
+### 1. Clone the Repository
 ```bash
-sudo apt update
-sudo apt upgrade
-sudo apt install python3 python3-dev python3-venv python3-pip libpq-dev libicu-dev python3-icu pkg-config
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-. "$HOME/.cargo/env"
+git clone https://github.com/DVCOM-UFC/synapse.git
+cd synapse
 ```
 
-## 2. Clone do Repositório
-
+### 2. Start PostgreSQL Container
 ```bash
-git clone git@github.com:DVCOM-UFC/synapse.git  # Via SSH
-git clone https://github.com/DVCOM-UFC/synapse.git  # Via HTTPS
+docker compose up -d --build
 ```
 
-## 3. Criar Virtualenv dentro da pasta raiz
+### 3. Review Configuration (Optional)
+- Update `server_name` in `homeserver.yaml` to your domain.
+- Change database credentials in both `homeserver.yaml` and `docker compose.yaml` for production.
 
+### 4. Run Installation Script
 ```bash
-cd synapse/
-git checkout develop-dvcom
-python3 -m venv .env
-. .env/bin/activate
+chmod +x install_synapse.sh
+./install_synapse.sh
 ```
 
-## 4. Instalar dependências do Synapse (com a .env ativada)
+---
 
-```bash
-poetry install --extras all
-```
+## Key Configuration Details
+- **Server URL**: `http://localhost:8008/` (update in `homeserver.yaml`)
+- **PostgreSQL Credentials**:
+  - Database: `synapse`
+  - User: `synapse`
+  - Password: `SynapeSecretPassword`
+- **Registration**: Open registration enabled (disable via `enable_registration: false` in `homeserver.yaml` for production).
 
-Se não ocorrer nenhum erro de instalação, pule o passo 5.
+---
 
-## 5. Possíveis erros de instalação
+## Security Notes
+⚠️ **This setup is not production-ready!**  
+- TLS is disabled (`tls: false` in `homeserver.yaml`). Use a reverse proxy (e.g., Nginx) for HTTPS.
+- `enable_registration_without_verification` allows unrestricted signups. Disable this in production.
+- Replace default secrets (`macaroon_secret_key`, `registration_shared_secret`, etc.).
 
-### pyvenv.cfg
+---
 
-Vá até o arquivo `pyvenv.cfg` dentro da virtualenv e altere:
+## Troubleshooting
+- **Port Conflicts**: Ensure ports `8008` and `3375` are free.
+- **Database Errors**: Verify PostgreSQL is running with `docker ps`.
+- **Installation Failures**:
+  - Ensure Rust and Python dependencies are installed.
+  - Run `source ~/.cargo/env` if Rust isn't recognized.
+- **Synapse Logs**: Check logs in `data/test.dv.techsmart.space.log.config`.
 
-```ini
-include-system-site-packages = true
-```
+---
 
-### rpds-py
+## Backup & Data Persistence
+- PostgreSQL data is stored in Docker volume `synapse_db_data`.
+- Backup `/var/lib/docker/volumes/synapse_db_data` periodically.
+- Synapse media files are stored in `data/media_store`.
 
-```bash
-pip wheel --no-cache-dir --use-pep517 "rpds-py==0.8.10"
-```
+---
 
-### pyicu
+## Accessing the Server
+1. Use a Matrix client (e.g., [Element](https://element.io)).
+2. Connect to `http://localhost:8008`.
+3. Create an account (open registration enabled).
 
-```bash
-pip wheel --no-cache-dir --use-pep517 "pyicu==2.14"
-```
+---
 
-Repita o passo 4 até completar a instalação sem erros.
-
-## 6. Executar o Synapse
-
-Se o passo 4 não retornou log de erro, o pacote `matrix-synapse` foi instalado corretamente.
-
-Copie os arquivos de configuração para a raiz do projeto:
-
-```bash
-cp docs/sample_config.yaml homeserver.yaml
-cp docs/sample_log_config.yaml log_config.yaml
-```
-
-- Defina um `server_name` e aplique nos arquivos copiados.
-- Ajuste os caminhos dos arquivos corretamente.
-- Para usar arquivos prontos configurados com PostgreSQL, baixe o seguinte arquivo (fornecer link se houver).
-
-Rodar o Synapse:
-
-```bash
-poetry run python -m synapse.app.homeserver -c homeserver.yaml
-```
-
+## License
+MIT License. See [LICENSE](LICENSE) (add if applicable).

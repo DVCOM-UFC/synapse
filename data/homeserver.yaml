@@ -1,0 +1,34 @@
+server_name: "test.dv.techsmart.space"
+pid_file: data/homeserver.pid
+listeners:
+  - port: 8008
+    tls: false
+    type: http
+    x_forwarded: true
+    resources:
+      - names: [client, federation]
+        compress: false
+
+## DATABASE ##
+database:
+  name: psycopg2
+  txn_limit: 10000
+  args:
+    user: synapse
+    password: SynapeSecretPassword
+    database: synapse
+    host: localhost
+    port: 3375
+    cp_min: 5
+    cp_max: 10
+log_config: "data/test.dv.techsmart.space.log.config"
+media_store_path: data/media_store
+registration_shared_secret: "bTx0jC,iEug0qyWOK_^&p1S@EyETyUPPuXPk~ib.vCFoA7&B:H"
+enable_registration: true
+enable_registration_without_verification: true
+report_stats: true
+macaroon_secret_key: "A=.hOE2Pt4=p7e;-ycVaz~Jh+rVbKdjve3zKEq+_MEHVQS5ZR="
+form_secret: "+zGWV_0pJ9azOe0hp2HS~1pDv6nECrwpnX=,sOXxg^qajSP5@A"
+signing_key_path: "data/test.dv.techsmart.space.signing.key"
+trusted_key_servers:
+  - server_name: "matrix.org"
