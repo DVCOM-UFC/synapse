@@ -1175,7 +1175,130 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         )
 
 
-class RoomRedactEventRestServlet(TransactionRestServlet):
+class RoomSelfRedactEventRestServlet(TransactionRestServlet): # Duplicar
+    CATEGORY = "Event sending requests"
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__(hs)
+        self.event_creation_handler = hs.get_event_creation_handler()
+        self.auth = hs.get_auth()
+        self._store = hs.get_datastores().main
+        self._relation_handler = hs.get_relations_handler()
+        self._msc3912_enabled = hs.config.experimental.msc3912_enabled
+
+    def register(self, http_server: HttpServer) -> None:
+        PATTERNS = "/rooms/(?P<room_id>[^/]*)/self_redact/(?P<event_id>[^/]*)"
+        register_txn_path(self, PATTERNS, http_server)
+
+    async def _do(
+        self,
+        request: SynapseRequest,
+        requester: Requester,
+        room_id: str,
+        event_id: str,
+        txn_id: Optional[str],
+    ) -> Tuple[int, JsonDict]:
+        content = parse_json_object_from_request(request)
+
+        requester_suspended = await self._store.get_user_suspended_status(
+            requester.user.to_string()
+        )
+
+        if requester_suspended:
+            event = await self._store.get_event(event_id, allow_none=True)
+            if event:
+                if event.sender != requester.user.to_string():
+                    raise SynapseError(
+                        403,
+                        "You can only redact your own events while account is suspended.",
+                        Codes.USER_ACCOUNT_SUSPENDED,
+                    )
+
+        # Ensure the redacts property in the content matches the one provided in
+        # the URL.
+        room_version = await self._store.get_room_version(room_id)
+        if room_version.updated_redaction_rules:
+            if "self_redacts" in content and content["self_redacts"] != event_id:
+                raise SynapseError(
+                    400,
+                    "Cannot provide a self_redacts value incoherent with the event_id of the URL parameter",
+                    Codes.INVALID_PARAM,
+                )
+            else:
+                content["self_redacts"] = event_id
+
+        try:
+            with_relations = None
+            if self._msc3912_enabled and "org.matrix.msc3912.with_relations" in content:
+                with_relations = content["org.matrix.msc3912.with_relations"]
+                del content["org.matrix.msc3912.with_relations"]
+
+            # Check if there's an existing event for this transaction now (even though
+            # create_and_send_nonmember_event also does it) because, if there's one,
+            # then we want to skip the call to redact_events_related_to.
+            event = None
+            if txn_id:
+                event = await self.event_creation_handler.get_event_from_transaction(
+                    requester, txn_id, room_id
+                )
+
+            # Event is not yet redacted, create a new event to redact it.
+            if event is None:
+                event_dict = {
+                    "type": EventTypes.SelfRedaction,
+                    "content": content,
+                    "room_id": room_id,
+                    "sender": requester.user.to_string(),
+                }
+                # Earlier room versions had a top-level redacts property.
+                if not room_version.updated_redaction_rules:
+                    event_dict["self_redacts"] = event_id
+
+                (
+                    event,
+                    _,
+                ) = await self.event_creation_handler.create_and_send_nonmember_event(
+                    requester, event_dict, txn_id=txn_id
+                )
+
+                if with_relations:
+                    run_as_background_process(
+                        "redact_related_events",
+                        self._relation_handler.redact_events_related_to,
+                        requester=requester,
+                        event_id=event_id,
+                        initial_redaction_event=event,
+                        relation_types=with_relations,
+                    )
+
+            event_id = event.event_id
+        except ShadowBanError:
+            event_id = generate_fake_event_id()
+
+        set_tag("event_id", event_id)
+        return 200, {"event_id": event_id}
+
+    async def on_POST(
+        self,
+        request: SynapseRequest,
+        room_id: str,
+        event_id: str,
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
+        return await self._do(request, requester, room_id, event_id, None)
+
+    async def on_PUT(
+        self, request: SynapseRequest, room_id: str, event_id: str, txn_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
+        set_tag("txn_id", txn_id)
+
+        return await self.txns.fetch_or_execute_request(
+            request, requester, self._do, request, requester, room_id, event_id, txn_id
+        )
+    
+
+class RoomRedactEventRestServlet(TransactionRestServlet): # Duplicar
     CATEGORY = "Event sending requests"
 
     def __init__(self, hs: "HomeServer"):
@@ -1592,6 +1715,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     PublicRoomListRestServlet(hs).register(http_server)
     RoomStateRestServlet(hs).register(http_server)
     RoomRedactEventRestServlet(hs).register(http_server)
+    RoomSelfRedactEventRestServlet(hs).register(http_server)
     RoomTypingRestServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
     RoomHierarchyRestServlet(hs).register(http_server)

@@ -103,6 +103,7 @@ class EventTypes:
     PowerLevels: Final = "m.room.power_levels"
     Aliases: Final = "m.room.aliases"
     Redaction: Final = "m.room.redaction"
+    SelfRedaction: Final = "m.room.self_redaction"
     ThirdPartyInvite: Final = "m.room.third_party_invite"
 
     RoomHistoryVisibility: Final = "m.room.history_visibility"
