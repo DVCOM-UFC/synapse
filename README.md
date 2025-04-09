@@ -79,7 +79,13 @@ cp docs/sample_log_config.yaml log_config.yaml
 
 - Defina um `server_name` e aplique nos arquivos copiados.
 - Ajuste os caminhos dos arquivos corretamente.
-- Para usar arquivos prontos configurados com PostgreSQL, baixe o seguinte arquivo (fornecer link se houver).
+- Para usar arquivos prontos configurados com PostgreSQL, baixe o seguinte [arquivo](https://drive.google.com/file/d/1BGpnB4JxmuR7BEELlEXfnLStM09WW2Tx/view?usp=sharing).
+
+Rodar o Banco de Dados com Docker:
+
+```bash
+sudo docker compose up --build
+```
 
 Rodar o Synapse:
 

@@ -1,0 +1,25 @@
+version: "3"
+
+services:
+  synapse_db:
+    image: docker.io/postgres:14-alpine
+    container_name: postgres_synapse
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=synapse
+      - POSTGRES_USER=synapse
+      - POSTGRES_PASSWORD=SynapeSecretPassword
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - synapse_exemplo_db_data:/var/lib/postgresql/data
+    ports:
+      - 3375:5432
+    networks:
+      - backend_synapse
+
+volumes:
+  synapse_exemplo_data:
+  synapse_exemplo_db_data:
+
+networks:
+  backend_synapse:
