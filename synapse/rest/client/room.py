@@ -1175,7 +1175,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         )
 
 
-class RoomSelfRedactEventRestServlet(TransactionRestServlet): # Duplicar
+class RoomSelfRedactEventRestServlet(TransactionRestServlet):
     CATEGORY = "Event sending requests"
 
     def __init__(self, hs: "HomeServer"):
@@ -1185,6 +1185,7 @@ class RoomSelfRedactEventRestServlet(TransactionRestServlet): # Duplicar
         self._store = hs.get_datastores().main
         self._relation_handler = hs.get_relations_handler()
         self._msc3912_enabled = hs.config.experimental.msc3912_enabled
+        self.clock = hs.get_clock()  # Usado para obter o timestamp atual
 
     def register(self, http_server: HttpServer) -> None:
         PATTERNS = "/rooms/(?P<room_id>[^/]*)/self_redact/(?P<event_id>[^/]*)"
@@ -1218,14 +1219,14 @@ class RoomSelfRedactEventRestServlet(TransactionRestServlet): # Duplicar
         # the URL.
         room_version = await self._store.get_room_version(room_id)
         if room_version.updated_redaction_rules:
-            if "self_redacts" in content and content["self_redacts"] != event_id:
+            if "redacts" in content and content["redacts"] != event_id:
                 raise SynapseError(
                     400,
                     "Cannot provide a self_redacts value incoherent with the event_id of the URL parameter",
                     Codes.INVALID_PARAM,
                 )
             else:
-                content["self_redacts"] = event_id
+                content["redacts"] = event_id
 
         try:
             with_relations = None
@@ -1252,7 +1253,7 @@ class RoomSelfRedactEventRestServlet(TransactionRestServlet): # Duplicar
                 }
                 # Earlier room versions had a top-level redacts property.
                 if not room_version.updated_redaction_rules:
-                    event_dict["self_redacts"] = event_id
+                    event_dict["redacts"] = event_id
 
                 (
                     event,
@@ -1296,7 +1297,6 @@ class RoomSelfRedactEventRestServlet(TransactionRestServlet): # Duplicar
         return await self.txns.fetch_or_execute_request(
             request, requester, self._do, request, requester, room_id, event_id, txn_id
         )
-    
 
 class RoomRedactEventRestServlet(TransactionRestServlet): # Duplicar
     CATEGORY = "Event sending requests"

@@ -596,6 +596,8 @@ class DatabasePool:
         if isinstance(self.engine, Sqlite3Engine):
             self._unsafe_to_upsert_tables.add("user_directory_search")
 
+        self._unsafe_to_upsert_tables.add("self_redactions")
+
         # Check ASAP (and then later, every 1s) to see if we have finished
         # background updates of tables that aren't safe to update.
         self._clock.call_later(
@@ -1463,7 +1465,6 @@ class DatabasePool:
             latter,
         )
         txn.execute(sql, list(allvalues.values()))
-
         return bool(txn.rowcount)
 
     async def simple_upsert_many(

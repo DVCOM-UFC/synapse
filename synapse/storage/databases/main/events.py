@@ -676,6 +676,45 @@ class PersistEventsStore:
             to_delete_membership_snapshots=user_ids_to_delete_membership_snapshots,
         )
 
+    async def insert_self_redaction(
+        self,
+        event_id: str,
+        user_id: str,
+        redacts: str,
+        have_censored: bool,
+        received_ts: int,
+    ) -> None:
+        """Insert a record into the self_redactions table."""
+        await self.db_pool.runInteraction(
+            "insert_self_redaction",
+            self._insert_self_redaction_txn,
+            event_id,
+            user_id,
+            redacts,
+            have_censored,
+            received_ts,
+        )
+
+    def _insert_self_redaction_txn(
+        self,
+        txn: LoggingTransaction,
+        event_id: str,
+        user_id: str,
+        redacts: str,
+        have_censored: bool,
+        received_ts: int,
+    ) -> None:
+        sql = """
+            INSERT INTO self_redactions (
+                event_id,
+                user_id,
+                redacts,
+                have_censored,
+                received_ts
+            ) VALUES (?, ?, ?, ?, ?)
+        """
+        txn.execute(sql, (event_id, user_id, redacts, have_censored, received_ts))
+
     async def calculate_chain_cover_index_for_events(
         self, room_id: str, events: Collection[EventBase]
     ) -> Dict[str, NewEventChainLinks]:
@@ -999,7 +1038,6 @@ class PersistEventsStore:
 
         # From this point onwards the events are only ones that weren't
         # rejected.
-
         self._update_metadata_tables_txn(
             txn,
             events_and_contexts=events_and_contexts,
@@ -2521,7 +2559,6 @@ class PersistEventsStore:
                 for event, _ in events_and_contexts
             ],
         )
-
         self.db_pool.simple_insert_many_txn(
             txn,
             table="events",
@@ -2684,7 +2721,9 @@ class PersistEventsStore:
             elif event.type == EventTypes.Retention:
                 # Update the room_retention table.
                 self._store_retention_policy_for_room_txn(txn, event)
-
+            elif event.type == EventTypes.SelfRedaction:
+                # Insert into the self_redactions table.
+                self._store_self_redaction(txn, event)
             self._handle_event_relations(txn, event)
 
             # Store the labels for this event.
@@ -2775,6 +2814,19 @@ class PersistEventsStore:
             },
         )
 
+    def _store_self_redaction(self, txn: LoggingTransaction, event: EventBase) -> None:
+        assert event.sender is not None
+        self.db_pool.simple_upsert_txn(
+            txn,
+            table="self_redactions",
+            keyvalues={"event_id": event.event_id},
+            values={
+                "redacts": event.redacts,
+                "user_id": event.sender,
+                "received_ts": self._clock.time_msec(),
+            },
+        )
+        
     def insert_labels_for_event_txn(
         self,
         txn: LoggingTransaction,
